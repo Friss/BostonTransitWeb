@@ -280,7 +280,7 @@ function rtupdate(data) {
 
 }
 
-var g_SERVER_ADDR = "transitserver.justdev.in";
+var g_SERVER_ADDR = "bostontransitserver.justdev.in";
 if (document.location.hostname == "localhost") {
   g_SERVER_ADDR = "localhost:8181";
 }
