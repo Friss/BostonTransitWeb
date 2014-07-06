@@ -17,5 +17,20 @@
     <script src="js/socket.io.js"></script>
     <script src="js/trainStops.js"></script>
     <script src="js/bostontransitweb.js"></script>
+    <!-- Piwik -->
+      <script type="text/javascript">
+        var _paq = _paq || [];
+        _paq.push(['trackPageView']);
+        _paq.push(['enableLinkTracking']);
+        (function() {
+          var u=(("https:" == document.location.protocol) ? "https" : "http") + "://stats.friss.me/";
+          _paq.push(['setTrackerUrl', u+'piwik.php']);
+          _paq.push(['setSiteId', 14]);
+          var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0]; g.type='text/javascript';
+          g.defer=true; g.async=true; g.src=u+'piwik.js'; s.parentNode.insertBefore(g,s);
+        })();
+      </script>
+      <noscript><p><img src="http://stats.friss.me/piwik.php?idsite=14" style="border:0;" alt="" /></p></noscript>
+    <!-- End Piwik Code -->
   </body>
 </html>
