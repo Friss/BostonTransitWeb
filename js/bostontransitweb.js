@@ -51,7 +51,11 @@ function drawMarker(tripid, color) {
   //
   if (dat.hasOwnProperty('osm_marker')) {
     var m = dat.osm_marker;
-    g_marker_layer.removeFeatures(m);
+    if (color === "bus"){
+      g_marker_layer_buses.removeFeatures(m);
+    }else{
+      g_marker_layer.removeFeatures(m);
+    }
     delete g_marker[tripid].osm_marker;
   }
 
