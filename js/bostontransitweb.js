@@ -42,36 +42,77 @@ var g_param = {
   stop_h: 18
 };
 
+var g_projection = new OpenLayers.Projection("EPSG:4326");
+
+var headingLookup = ["0", "45", "90", "135", "180", "225", "270", "315"];
+
 function drawMarker(tripid, color) {
-  var headingLookup = ["0", "45", "90", "135", "180", "225", "270", "315"];
+  var trip = g_marker[tripid];
 
-  var dat = g_marker[tripid];
-
-  // Remove it
-  //
-  if (dat.hasOwnProperty('osm_marker')) {
-    var m = dat.osm_marker;
-    if (color === "bus"){
-      g_marker_layer_buses.removeFeatures(m);
-    }else{
-      g_marker_layer.removeFeatures(m);
+  // If it exists update it!
+  if (trip.hasOwnProperty('osm_marker')) {
+    var newLoc = new OpenLayers.LonLat(trip.Long, trip.Lat)
+      .transform(
+        g_projection,
+        g_map.getProjectionObject()
+      );
+    trip.osm_marker.data.predictionStop = trip.nextStop;
+    trip.osm_marker.data.predictionTime = trip.predTime;
+    trip.osm_marker.style.externalGraphic = iconURL(trip);
+    trip.osm_marker.move(newLoc);
+    if (trip.osm_marker.hasOwnProperty('popup') && trip.osm_marker.popup !== null){
+      console.log(trip);
+      destoryPopUp(trip.osm_marker);
+      var popup = createPopUp(trip.osm_marker);
+      trip.osm_marker.popup = popup;
+      g_map.addPopup(popup);
     }
-    delete g_marker[tripid].osm_marker;
+    return
+  }else{
+
+    var scale_factor = 1.0;
+    var bus_w = g_param.bus_w;
+    var bus_h = g_param.bus_h;
+
+    if ((g_map.zoom <= 13) && (g_map.zoom >= 8)) {
+      scale_factor = Math.exp(Math.log(2) * (g_map.zoom - 14));
+      bus_w *= scale_factor;
+      bus_h *= scale_factor;
+    }
+
+    var icon = iconURL(trip);
+
+    trip.osm_marker = new OpenLayers.Feature.Vector(
+      new OpenLayers.Geometry.Point(trip.Long, trip.Lat).transform(g_projection, g_map.getProjectionObject()),
+      {
+        predictionStop: trip.nextStop,
+        predictionTime: trip.predTime,
+        route: trip.route,
+        color: trip.Color,
+      },
+      {
+        externalGraphic: icon,
+        graphicHeight: bus_h,
+        graphicWidth: bus_w,
+        graphicXOffset: -(bus_w / 2),
+        graphicYOffset: -bus_h
+      }
+    );
+
+    if (trip.Color !== "bus") {
+      g_marker_layer.addFeatures(trip.osm_marker);
+    } else {
+      g_marker_layer_buses.addFeatures(trip.osm_marker);
+    }
+    return
   }
+}
 
-  var scale_factor = 1.0;
-  var bus_w = g_param.bus_w;
-  var bus_h = g_param.bus_h;
-
-  if ((g_map.zoom <= 13) && (g_map.zoom >= 8)) {
-    scale_factor = Math.exp(Math.log(2) * (g_map.zoom - 14));
-    bus_w *= scale_factor;
-    bus_h *= scale_factor;
-  }
-
+function iconURL (trip) {
   var icon;
+  var color = trip.Color;
   if ((color === "red") || (color === "blue") || (color === "orange")) {
-    var iheading = Math.floor((parseInt(dat.Heading, 10) + 23) / 45);
+    var iheading = Math.floor((parseInt(trip.Heading, 10) + 23) / 45);
     if (iheading > 7) {
       iheading = 0;
     }
@@ -79,29 +120,7 @@ function drawMarker(tripid, color) {
   } else {
     icon = "img/" + color + "_fade.png";
   }
-
-  dat.osm_marker = new OpenLayers.Feature.Vector(
-    new OpenLayers.Geometry.Point(dat.Long, dat.Lat).transform(new OpenLayers.Projection("EPSG:4326"), g_map.getProjectionObject()),
-    {
-      predictionStop: dat.nextStop,
-      predictionTime: dat.predTime,
-      route: dat.route,
-      color: dat.Color,
-    },
-    {
-      externalGraphic: icon,
-      graphicHeight: bus_h,
-      graphicWidth: bus_w,
-      graphicXOffset: -(bus_w / 2),
-      graphicYOffset: -bus_h
-    }
-  );
-
-  if (dat.Color !== "bus") {
-    g_marker_layer.addFeatures(dat.osm_marker);
-  } else {
-    g_marker_layer_buses.addFeatures(dat.osm_marker);
-  }
+  return icon;
 }
 
 function updateTrain(data, color) {
@@ -308,7 +327,7 @@ function drawStops(force) {
 
     lonlat = new OpenLayers.LonLat(st.lon, st.lat)
       .transform(
-        new OpenLayers.Projection("EPSG:4326"), // transform from WGS 1984
+        g_projection, // transform from WGS 1984
         g_map.getProjectionObject() // to Spherical Mercator Projection
       );
 
@@ -347,6 +366,24 @@ function drawStops(force) {
   }
 }
 
+function createPopUp(feature){
+  var popup = new OpenLayers.Popup.FramedCloud("popup",
+    OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+    null,
+    "<div style='font-size:.8em'>Line: " + feature.data.color + "<br>Route: " + feature.data.route + "<br>Next Stop: " + feature.data.predictionStop + "<br>Arriving In: " + feature.data.predictionTime + "</div>",
+    null,
+    true
+    );
+  return popup;
+}
+
+function destoryPopUp (feature) {
+  g_map.removePopup(feature.popup);
+  feature.popup.destroy();
+  feature.popup = null;
+  return;
+}
+
 function initMap() {
   g_map = new OpenLayers.Map("mapdiv");
 
@@ -376,36 +413,17 @@ function initMap() {
 
   g_map.addLayer(transport);
 
-  var lat = 42.3583183;
-  var lon = -71.0584536;
-
-  var lonLat = new OpenLayers.LonLat(lon, lat)
-    .transform(
-      new OpenLayers.Projection("EPSG:4326"),
-      g_map.getProjectionObject()
-    );
-
-  //var zoom=14;
-
   g_marker_layer = new OpenLayers.Layer.Vector("Trains", {
     eventListeners: {
       'featureselected': function (evt) {
         var feature = evt.feature;
-        var popup = new OpenLayers.Popup.FramedCloud("popup",
-          OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
-          null,
-          "<div style='font-size:.8em'>Line: " + feature.attributes.color + "<br>Route: " + feature.attributes.route + "<br>Next Stop: " + feature.attributes.predictionStop + "<br>Arriving In: " + feature.attributes.predictionTime + "</div>",
-          null,
-          true
-          );
+        var popup = createPopUp(feature);
         feature.popup = popup;
         g_map.addPopup(popup);
       },
       'featureunselected': function (evt) {
         var feature = evt.feature;
-        g_map.removePopup(feature.popup);
-        feature.popup.destroy();
-        feature.popup = null;
+        destoryPopUp(feature);
       }
     }
   });
@@ -414,48 +432,72 @@ function initMap() {
     eventListeners: {
       'featureselected': function (evt) {
         var feature = evt.feature;
-        var popup = new OpenLayers.Popup.FramedCloud("popup",
-          OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
-          null,
-          "<div style='font-size:.8em'>Line: " + feature.attributes.color + "<br>Route: " + feature.attributes.route + "<br>Next Stop: " + feature.attributes.predictionStop + "<br>Arriving In: " + feature.attributes.predictionTime + "</div>",
-          null,
-          true
-          );
+         var popup = createPopUp(feature);
         feature.popup = popup;
         g_map.addPopup(popup);
       },
       'featureunselected': function (evt) {
         var feature = evt.feature;
         g_map.removePopup(feature.popup);
-        feature.popup.destroy();
-        feature.popup = null;
+        destoryPopUp(feature);
       }
     }
   });
 
   g_marker_layer_buses.setVisibility(false);
-
-  var selector = new OpenLayers.Control.SelectFeature(g_marker_layer, {
-    hover: true,
-    autoActivate: true
-  });
-
-  var busSelector = new OpenLayers.Control.SelectFeature(g_marker_layer_buses, {
-    hover: true,
-    autoActivate: true
-  });
-
-  g_map.addControl(selector);
-  g_map.addControl(busSelector);
   g_map.addLayer(g_marker_layer);
   g_map.addLayer(g_marker_layer_buses);
+
+  var selector = new OpenLayers.Control.SelectFeature([g_marker_layer, g_marker_layer_buses],
+    {
+       clickout: true, toggle: false,
+       multiple: false, hover: false,
+       toggleKey: "ctrlKey", // ctrl key removes from selection
+       multipleKey: "shiftKey", // shift key adds to selection
+      autoActivate: true
+   }
+  );
+
+
+  g_map.addControl(selector);
 
   g_stop_layer = new OpenLayers.Layer.Markers("Train Stops");
 
   drawStops(true);
   g_map.addLayer(g_stop_layer);
   g_map.setLayerIndex(g_stop_layer, 0);
+
+    var geolocate = new OpenLayers.Control.Geolocate({
+    bind: false,
+    geolocationOptions: {
+        enableHighAccuracy: false,
+        maximumAge: 0,
+        timeout: 7000
+    }
+  });
+
+  g_map.addControl(geolocate);
+
+  geolocate.events.register("locationupdated",geolocate,function(e) {
+    lonLat = new OpenLayers.LonLat(e.position.coords.longitude, e.position.coords.latitude).transform(
+        new OpenLayers.Projection("EPSG:4326"),
+        g_map.getProjectionObject()
+      );
+    g_map.setCenter(lonLat, g_zoom);
+  });
+
+  geolocate.activate();
+
+  var lat = 42.3583183;
+  var lon = -71.0584536;
+  var lonLat;
+
+  lonLat = new OpenLayers.LonLat(lon, lat).transform(
+        new OpenLayers.Projection("EPSG:4326"),
+        g_map.getProjectionObject()
+      );
   g_map.setCenter(lonLat, g_zoom);
+
 }
 
 $(document).ready(function () {
